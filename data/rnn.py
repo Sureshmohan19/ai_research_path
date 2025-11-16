@@ -1,11 +1,12 @@
 # Recurrent Neural Network Implementation
 import jax
 import jax.numpy as jnp
+import wandb
 
-raw_text = 'hello world this is a test of recurrent neural networks learning text patterns'
-hidden_size = 64
+raw_text = 'hello world'
+hidden_size = 8
 num_of_layers = 1
-EPOCHS = 500
+EPOCHS = 250
 learning_rate = 0.01
 
 # training data
@@ -154,6 +155,17 @@ def update(params, grads, lr=0.1):
 
 # train
 def train_rnn(data, params, hidden_size, vocab_size, epoch, lr=learning_rate):
+    # wandb init
+    wandb.init(
+        project="rnn_research",
+        config={
+            "hidden_size": {hidden_size},
+            "vocab_size": {vocab_size},
+            "num_layers": {num_of_layers},
+            "learning_rate": {learning_rate},
+            "text_length": {len(raw_text)},
+            "epoch": {EPOCHS},
+        })
     for epo in range(epoch):
         total_loss = 0
         for input_idx, target_idx in data:
@@ -162,7 +174,11 @@ def train_rnn(data, params, hidden_size, vocab_size, epoch, lr=learning_rate):
             total_loss += loss
             grads = backward_pass(params, input_idx, target_idx, probs, hidden_states)
             params = update(params, grads, lr)
-
+        # wandb log
+        wandb.log({
+            "loss": float(total_loss),
+            "epoch": epo,
+        })
         if epo % 10 == 0:
             print(f"Epoch:{epo}, Loss:{total_loss:.4f}")
 
@@ -213,3 +229,4 @@ if __name__ == "__main__":
     params = train_rnn(data, params, hidden_size, vocab_size, epoch=EPOCHS)
     output = generate(params, 'h', char_to_idx, idx_to_char, num_chars=10)
     print(output)
+    wandb.finish()
