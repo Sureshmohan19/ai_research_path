@@ -44,7 +44,7 @@ echo "➡ Restart shell or run: source ~/.bashrc  (or ~/.zshrc) once boostrap sc
 
 echo "Setting up Micromamba environment ai_research..."
 eval "$($HOME/.local/bin/micromamba shell hook -s $DETECTED_SHELL)"
-micromamba create -y -n ai_research python=3.10 jax
+micromamba create -y -n ai_research python=3.10 jax wandb
 echo "Environment 'ai_research' created."
 echo "To activate it, run: micromamba activate ai_research"
 
@@ -104,3 +104,4 @@ echo "Installing Gruvbox colorscheme..."
 mkdir -p ~/.vim/colors
 curl -fLo ~/.vim/colors/gruvbox.vim --create-dirs \
 https://raw.githubusercontent.com/morhetz/gruvbox/master/colors/gruvbox.vim
+
