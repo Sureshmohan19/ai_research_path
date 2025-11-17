@@ -36,16 +36,19 @@ def update(w, b, X, y, lr):
     
 # training loop
 def train(w, b, X, y, lr, epochs=EPOCHS):
+    print(f"Initial Weigths: {w}")
+    print(f"Inital Bias: {b}")
     for epoch in range(epochs):
         w, b = update(w, b, X, y, lr)
         if epoch %100 == 0:
             loss = loss_fn(w, b, X, y)
-            print(f"Epoch:{epoch},  Loss:{loss:.4f}")
+            print(f"Epoch:{epoch} | Loss:{loss:.4f} | Weights: {w} | Bias: {b:.4f}")
+    print(f"Final Weights: {w}")
+    print(f"Final bias: {b}")
     return w, b
 
 # predict
-def predict(w, b, X):
-    return jnp.array([forward(x, w, b) for x in X])
+def predict(w, b, X): return jnp.array([forward(x, w, b) for x in X])
 
 # Data generation
 def get_data(type = "AND"):
@@ -57,22 +60,16 @@ def get_data(type = "AND"):
         X = jnp.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
         y = jnp.array([0.0, 1.0, 1.0, 1.0])
         return X, y
-    else:
-        raise ValueError(f'type:{type} is not valid. Only AND or OR is possible')
+    else: raise ValueError(f'type:{type} is not valid. Only AND or OR is possible')
 
 # main function
 if __name__ == "__main__":
-
-    # test wtih AND gate
+    print(f"Single layer perceptron implementation...")
+    print(f"_" * 40)
+    
     X, y = get_data(type= "OR")
-
-    # init weights and bias
     w, b = init_wb(input_dims=2, seed=42)
-
-    # train and predict
     w, b = train(w, b, X, y, lr=0.1)
     prediction = predict(w, b, X)
     for i in range(len(X)):
         print(f"Input:{X[i]}, Target:{y[i]}, Prediction:{prediction[i]}")
-
-    
