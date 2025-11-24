@@ -11,7 +11,7 @@ learning_rate = 0.001
 
 # init_params
 def init_params(key, in_dim, out_dim, hid_dim):
-    # example key structure
+    # example keys structure
     # [[1797259609 2579123966]
     # [ 928981903 3453687069]
     # [4146024105 2718843009]
@@ -82,7 +82,14 @@ def dtanh(x):
 def forward_gru(params, x_seq):
     T = x_seq.shape[0] # 199
     hidden_dim = params["b_r"].shape[0] # 8
+    
+    # h: hidden state - the "memory" of the RNN
+    # Initialize to zeros for the first time step (t=0)
+    # This means the network starts with no prior context/memory
+    # As we process the sequence, h gets updated at each time step
+    # carrying information forward through time
     h = jnp.zeros((hidden_dim, )) # (8, )
+    
     preds = []
     cache = {
         "x_t"       : [],       # Input at each timestep
@@ -97,24 +104,76 @@ def forward_gru(params, x_seq):
         "y_t"       : []        # Output at each timestep
     }
 
-    for t in range(T):
+    for t in range(T): # (0, 199)
         x_t = x_seq[t]
+
         # Gate pre-activations
+        # General form: output = weights × input + bias
+        #
+        # GRU gates need TWO inputs combined:
+        # 1. Current input x_t
+        # 2. Previous hidden state h
+        #
+        # Derivation for Reset Gate:
+        # We want: f(x_t, h) → (8,) output
+        #
+        # Step 1: Transform x_t to hidden space
+        # W_r @ x_t  where W_r: (8, 1), x_t: (1,) → result: (8,)
+        #
+        # Step 2: Transform h (already in hidden space)
+        # U_r @ h    where U_r: (8, 8), h: (8,) → result: (8,)
+        #
+        # Step 3: Combine both transformations + bias
+        # s_r = W_r @ x_t + U_r @ h + b_r
+        #
+        # This is: output = W₁×input₁ + W₂×input₂ + bias
+        #          (generalized wx + b for multiple inputs)
         s_r = params["W_r"] @ x_t + params["U_r"] @ h + params["b_r"]
+        
+        # Same derivation for Update Gate (different weights, same structure)
         s_z = params["W_z"] @ x_t + params["U_z"] @ h + params["b_z"]
 
         # Gates activation
+        # Apply sigmoid to get gate values in [0, 1]
         r_t = sigmoid(s_r)
         z_t = sigmoid(s_z)
 
-        # Candidate
+        # Candidate hidden state (proposal for new memory)
+        # 
+        # Step 1: Apply reset gate to old memory
+        # - r_t * h: Filters old hidden state based on relevance
+        # - If r_t ≈ 1: Keep past memory (pattern continues)
+        # - If r_t ≈ 0: Forget past memory (fresh start)
+        #
+        # Step 2: Combine filtered memory with current input
+        # s_h = W_h @ x_t + U_h @ (r_t * h) + b_h
+        # - W_h @ x_t: Process current input
+        # - U_h @ (r_t * h): Process relevant past memory
+        # - This creates a "proposal" for what new memory should be
+        #
+        # Step 3: Apply tanh activation
+        # - Squashes to [-1, 1] range
+        # - candidate: Proposed new hidden state based on current context
         s_h = params["W_h"] @ x_t + params["U_h"] @ (r_t * h) + params["b_h"]
         candidate = jnp.tanh(s_h)
 
-        # Final hidden
+        # Final hidden state (blend old and new)
+        #
+        # Update gate z_t controls the mixing ratio:
+        # - z_t * h: Keep this much of OLD memory
+        # - (1 - z_t) * candidate: Accept this much of NEW candidate
+        #
+        # Each dimension can blend differently:
+        # - If z_t[i] ≈ 1: Dimension i keeps old memory (ignore new info)
+        # - If z_t[i] ≈ 0: Dimension i updates heavily (accept new info)
+        # - If z_t[i] ≈ 0.5: Dimension i blends 50-50
+        #
+        # This weighted average lets GRU selectively update its memory
         h_new = (z_t * h) + ((1 - z_t) * candidate)
 
-        # Output
+        # Output layer
+        # Transform final hidden state to prediction
+        # y_t: Predicted next value in sequence (e.g., next sin wave value)
         y_t = params["W_y"] @ h_new + params["b_y"]
         preds.append(y_t)
 
@@ -130,6 +189,9 @@ def forward_gru(params, x_seq):
         cache["s_h"].append(s_h)
         cache["y_t"].append(y_t)
 
+        # Update hidden state for next time step
+        # h becomes h_new, carrying forward the updated memory
+        # This h will be used as "previous hidden state" when processing the next input
         h = h_new
     return jnp.stack(preds, axis=0), cache
 

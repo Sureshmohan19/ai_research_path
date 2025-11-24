@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 
 learning_rate = 0.5
-EPOCHS = 10000
+EPOCHS = 5000
 hidden_size = 4
 hidden_layers = 1
 
@@ -85,7 +85,6 @@ def forward_pass(X, W, B):
         # i = 0  -> hidden layer activation shape = (4,)
         # i = 1  -> output layer activation shape = (1,)
         a = frelu(z) if i < len(W) -1 else fsigmoid(z)
-        # 
         Z.append(z)
         A.append(a)
     
@@ -135,28 +134,65 @@ def backward_pass(X, y, W, B, Z, A):
     #
     # Final delta formula:
     # delta = 2 * (A[-1] - y) * (A[-1] * (1 - A[-1]))
-    delta = 2 * (A[-1] - y) * (A[-1] * (1 - A[-1]))
+    delta = 2 * (A[-1] - y) * (A[-1] * (1 - A[-1])) # we could use fn here but choose not to
 
     # Backpropagate through layers
     # Loop backward through layers: i = n_layers-1, n_layers-2, ..., 0
-    # This allows backpropagation from output layer to input layer.
     for i in range(n_layers -1, -1, -1): # range(2-1, -1, -1) -> range(1, -1,-1) so 1,0
-        dW[i] = jnp.dot(A[i].T, delta) / batch_size 
+        # Compute weight gradients (dW)
+        # ∂L/∂W = A.T @ δ / batch_size
+        #
+        # Derivation:
+        # Forward: z = A @ W + B
+        # Therefore: ∂z/∂W = A
+        # By chain rule: ∂L/∂W = ∂L/∂z * ∂z/∂W = δ * A
+        #
+        # Since we have batch_size samples, we compute:
+        # - A[i].T has shape (input_dim, batch_size)
+        # - delta has shape (batch_size, output_dim)
+        # - Result: (input_dim, output_dim) which matches W[i] shape
+        #
+        # We average over the batch (divide by batch_size) to get the mean gradient
+        dW[i] = jnp.dot(A[i].T, delta) / batch_size
+        
+        # Compute bias gradients (dB)
+        # ∂L/∂B = sum(δ) / batch_size
+        #
+        # Derivation:
+        # Forward: z = A @ W + B
+        # Therefore: ∂z/∂B = 1
+        # By chain rule: ∂L/∂B = ∂L/∂z * ∂z/∂B = δ * 1 = δ
+        #
+        # Since bias is added to each sample in the batch:
+        # - We sum delta across all samples (axis=0)
+        # - Then average by dividing by batch_size
+        # - Result has shape (output_dim,) which matches B[i] shape
         dB[i] = jnp.sum(delta, axis=0) / batch_size
 
-
         if i > 0:
-            # Backprop to previous layer:
+            # Backpropagate delta to the previous layer
+            # We need to compute: δ[i-1] = ∂L/∂z[i-1]
+            #
+            # Chain rule:
+            # δ[i-1] = (∂L/∂z[i]) * (∂z[i]/∂a[i-1]) * (∂a[i-1]/∂z[i-1])
+            #        = δ[i] * W[i] * ReLU'(z[i-1])
+            #
+            # Step 1: Propagate through weights
+            # Forward: z[i] = a[i-1] @ W[i] + B[i]
+            # Therefore: ∂z[i]/∂a[i-1] = W[i]
+            # So: δ @ W[i].T gives us the error flowing back through the weights
+            #
+            # Step 2: Apply activation derivative
+            # ReLU(z) = max(0, z)
+            # ReLU'(z) = 1 if z > 0, else 0
+            #
+            # This masks out gradients where the neuron was "off" (z ≤ 0)
+            # Only neurons that were active (z > 0) receive gradient flow
+            #
+            # Final formula:
             # delta_prev = (delta @ W[i].T) * ReLU'(Z[i-1])
-            #
-            # ReLU derivative (direct formula):
-            # ReLU'(z) = 1 if z > 0 else 0
-            #
-            # Implemented as:
-            # (Z[i-1] > 0).astype(float)
-            #
             delta = (delta @ W[i].T) * (Z[i-1] > 0).astype(float)
-
+    
     return dW, dB
     
 # update

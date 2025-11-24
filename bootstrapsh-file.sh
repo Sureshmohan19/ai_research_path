@@ -32,7 +32,13 @@ echo "Using $DETECTED_SHELL shell to run commands for this script. moving on to 
 echo "Updating system packages..."
 sudo apt-get update -y
 sudo apt-get upgrade -y
-echo "System updated. moving to micromamba installation now"
+echo "System updated. moving to installing C build dependencies"
+
+echo "Installing C build dependencies..."
+sudo apt-get install -y build-essential
+sudo apt-get install -y libncurses-dev
+sudo apt-get install -y libcjson-dev
+echo "C dependencies installed. moving to micromamba installation"
 
 # Install Micromamba (official installer)
 echo "Installing Micromamba..."
@@ -62,7 +68,7 @@ syntax enable
 
 " UI settings
 set number
-set relativenumber
+set norelativenumber
 set cursorline
 set ruler
 set cmdheight=1
